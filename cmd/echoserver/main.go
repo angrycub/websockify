@@ -10,14 +10,22 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/coder/websockify/version"
 )
 
 func main() {
 	var (
-		port = flag.String("port", "5901", "Port to listen on")
-		help = flag.Bool("help", false, "Show this help message")
+		port        = flag.String("port", "5901", "Port to listen on")
+		showVersion = flag.Bool("version", false, "Show version information")
+		help        = flag.Bool("help", false, "Show this help message")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("echoserver %s\n", version.Version())
+		os.Exit(0)
+	}
 
 	if *help {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])

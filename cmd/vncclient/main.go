@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coder/websockify/rfb"
+	"github.com/coder/websockify/version"
 	"github.com/coder/websockify/viewer"
 )
 
@@ -50,9 +51,15 @@ func main() {
 		frameRate      = flag.Int("fps", 2, "Frame rate for animations (frames per second)")
 		gui            = flag.Bool("gui", false, "Show framebuffer in GUI window (requires GUI environment)")
 		testPixelFormat = flag.Bool("test-pixel-format", false, "Send a test SetPixelFormat message (16bpp RGB565)")
+		showVersion    = flag.Bool("version", false, "Show version information")
 		help           = flag.Bool("help", false, "Show this help message")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("vncclient %s\n", version.Version())
+		os.Exit(0)
+	}
 
 	if *help {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coder/websockify/rfb"
+	"github.com/coder/websockify/version"
 	"github.com/coder/websockify/viewer"
 )
 
@@ -48,13 +49,19 @@ type AnimationGenerator func(frameNumber, width, height int) []byte
 
 func main() {
 	var (
-		port = flag.String("port", "5900", "Port to listen on")
-		animation = flag.String("animation", "wheel", "Animation type: wheel, waves, plasma, orbits, gradient")
-		gui = flag.Bool("gui", false, "Show server framebuffer in GUI window (requires GUI environment)")
-		fps = flag.Int("fps", 30, "Frame rate for GUI animation (frames per second)")
-		help = flag.Bool("help", false, "Show this help message")
+		port        = flag.String("port", "5900", "Port to listen on")
+		animation   = flag.String("animation", "wheel", "Animation type: wheel, waves, plasma, orbits, gradient")
+		gui         = flag.Bool("gui", false, "Show server framebuffer in GUI window (requires GUI environment)")
+		fps         = flag.Int("fps", 30, "Frame rate for GUI animation (frames per second)")
+		showVersion = flag.Bool("version", false, "Show version information")
+		help        = flag.Bool("help", false, "Show this help message")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("vncserver %s\n", version.Version())
+		os.Exit(0)
+	}
 
 	if *help {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])

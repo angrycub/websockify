@@ -10,16 +10,23 @@ import (
 	"syscall"
 
 	"github.com/coder/websockify"
+	"github.com/coder/websockify/version"
 )
 
 func main() {
 	var (
-		listener = flag.String("listen", "0.0.0.0:6080", "Host:port to listen on")
-		target   = flag.String("target", "localhost:5900", "Host:port to connect to")
-		webRoot  = flag.String("web-root", "", "Path to web files (leave empty for no static files)")
-		help     = flag.Bool("help", false, "Show this help message")
+		listener    = flag.String("listen", "0.0.0.0:6080", "Host:port to listen on")
+		target      = flag.String("target", "localhost:5900", "Host:port to connect to")
+		webRoot     = flag.String("web-root", "", "Path to web files (leave empty for no static files)")
+		showVersion = flag.Bool("version", false, "Show version information")
+		help        = flag.Bool("help", false, "Show this help message")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("websockify %s\n", version.Version())
+		os.Exit(0)
+	}
 
 	if *help {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])

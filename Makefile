@@ -8,13 +8,23 @@ ECHO_BINARY=$(BIN_DIR)/echoserver
 VNC_BINARY=$(BIN_DIR)/vncserver
 VNC_CLIENT_BINARY=$(BIN_DIR)/vncclient
 
+# Version information
+VERSION := $(shell ./scripts/version.sh)
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Build flags for version injection
+LDFLAGS := -X 'github.com/coder/websockify/version.tag=$(VERSION)' \
+           -X 'github.com/coder/websockify/version.commit=$(COMMIT)' \
+           -X 'github.com/coder/websockify/version.date=$(DATE)'
+
 # Default target
 all: build
 
 # Build the binary
 build:
 	mkdir -p $(BIN_DIR)
-	go build -o $(BINARY_NAME) $(CMD_DIR)
+	go build -ldflags="$(LDFLAGS)" -o $(BINARY_NAME) $(CMD_DIR)
 
 # Clean build artifacts
 clean:
@@ -50,13 +60,13 @@ deps:
 # Build test servers
 build-servers:
 	mkdir -p $(BIN_DIR)
-	go build -o $(ECHO_BINARY) ./cmd/echoserver
-	go build -o $(VNC_BINARY) ./cmd/vncserver
+	go build -ldflags="$(LDFLAGS)" -o $(ECHO_BINARY) ./cmd/echoserver
+	CGO_LDFLAGS="-Wl,-no_warn_duplicate_libraries" go build -ldflags="$(LDFLAGS)" -o $(VNC_BINARY) ./cmd/vncserver
 
 # Build VNC client
 build-client:
 	mkdir -p $(BIN_DIR)
-	go build -o $(VNC_CLIENT_BINARY) ./cmd/vncclient
+	CGO_LDFLAGS="-Wl,-no_warn_duplicate_libraries" go build -ldflags="$(LDFLAGS)" -o $(VNC_CLIENT_BINARY) ./cmd/vncclient
 
 # Run echo server (for websockify testing)
 run-echo: build-servers
@@ -87,3 +97,7 @@ help:
 	@echo "  vet           - Run go vet"
 	@echo "  deps          - Download and tidy dependencies"
 	@echo "  help          - Show this help message"
+	@echo ""
+	@echo "Version information:"
+	@echo "  Current version: $(VERSION)"
+	@echo "  All binaries support -version flag to show version info"

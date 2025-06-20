@@ -85,4 +85,7 @@ result
 # dlv debug binaries for go tests
 __debug_bin*
 
+# Test output directory for frame captures
+test_output/
+
 **/.claude/settings.local.json

@@ -190,3 +190,8 @@ client := &VNCClient{}
 framebuffer := client.GetFramebuffer()
 pixel := client.GetPixel(100, 100)  // Get pixel at coordinates (100,100)
 ```
+
+## Markdown Guidelines
+
+- Common markdown formatting requires that headers, code-fences, and lists require one blank line of standoff above and below them. 
+- All files MUST end in a blank line--you will have to run `echo "" >> FILENAME` where FILENAME is the file to which you need to add a final line feed. 

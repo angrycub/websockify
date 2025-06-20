@@ -14,11 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coder/websockify/rfb"
 	"github.com/coder/websockify/viewer"
 )
 
 const (
-	RFB_VERSION = "RFB 003.008\n"
 	SCREEN_WIDTH  = 800
 	SCREEN_HEIGHT = 600
 )
@@ -28,25 +28,13 @@ var (
 	globalServer *VNCServer
 )
 
-type PixelFormat struct {
-	bitsPerPixel   uint8
-	depth          uint8
-	bigEndianFlag  uint8
-	trueColorFlag  uint8
-	redMax         uint16
-	greenMax       uint16
-	blueMax        uint16
-	redShift       uint8
-	greenShift     uint8
-	blueShift      uint8
-}
 
 type VNCConnection struct {
 	conn        net.Conn
 	frameNumber int // Frame number for 30fps animation
 	animationType string // Type of animation to generate
 	buffer      []byte   // Message buffer for proper framing
-	pixelFormat PixelFormat // Client's requested pixel format
+	pixelFormat rfb.PixelFormat // Client's requested pixel format
 }
 
 type VNCServer struct {
@@ -195,18 +183,7 @@ func handleVNCConnection(conn net.Conn) {
 	log.Printf("New VNC connection from %s", clientAddr)
 
 	// Create VNC connection state with default pixel format (matches ServerInit)
-	defaultPixelFormat := PixelFormat{
-		bitsPerPixel:   32,
-		depth:          24,
-		bigEndianFlag:  0,
-		trueColorFlag:  1,
-		redMax:         255,
-		greenMax:       255,
-		blueMax:        255,
-		redShift:       16,
-		greenShift:     8,
-		blueShift:      0,
-	}
+	defaultPixelFormat := rfb.DefaultPixelFormat()
 	
 	vncConn := &VNCConnection{
 		conn:        conn,
@@ -249,20 +226,19 @@ func handleVNCConnection(conn net.Conn) {
 
 func doVNCHandshake(conn net.Conn) error {
 	// Step 1: Send RFB version
-	if _, err := conn.Write([]byte(RFB_VERSION)); err != nil {
+	if err := rfb.SendRFBVersion(conn); err != nil {
 		return fmt.Errorf("failed to send RFB version: %v", err)
 	}
 
 	// Step 2: Read client version
-	clientVersion := make([]byte, 12)
-	if _, err := conn.Read(clientVersion); err != nil {
+	clientVersion, err := rfb.ReadRFBVersion(conn)
+	if err != nil {
 		return fmt.Errorf("failed to read client version: %v", err)
 	}
-	log.Printf("Client version: %s", string(clientVersion))
+	log.Printf("Client version: %s", clientVersion)
 
 	// Step 3: Send security types (1 = None)
-	securityTypes := []byte{1, 1} // 1 security type, type 1 (None)
-	if _, err := conn.Write(securityTypes); err != nil {
+	if err := rfb.SendSecurityTypes(conn, []uint8{rfb.SecurityNone}); err != nil {
 		return fmt.Errorf("failed to send security types: %v", err)
 	}
 
@@ -273,8 +249,7 @@ func doVNCHandshake(conn net.Conn) error {
 	}
 
 	// Step 5: Send security result (0 = OK)
-	securityResult := []byte{0, 0, 0, 0} // 32-bit 0
-	if _, err := conn.Write(securityResult); err != nil {
+	if err := rfb.SendSecurityResult(conn, 0); err != nil {
 		return fmt.Errorf("failed to send security result: %v", err)
 	}
 
@@ -285,49 +260,15 @@ func doVNCHandshake(conn net.Conn) error {
 	}
 
 	// Step 7: Send ServerInit
-	serverInit := make([]byte, 24)
-	// Width (16-bit big-endian)
-	serverInit[0] = byte(SCREEN_WIDTH >> 8)
-	serverInit[1] = byte(SCREEN_WIDTH & 0xFF)
-	// Height (16-bit big-endian)
-	serverInit[2] = byte(SCREEN_HEIGHT >> 8)
-	serverInit[3] = byte(SCREEN_HEIGHT & 0xFF)
-	// Pixel format (16 bytes) - standard 32bpp RGBA format
-	serverInit[4] = 32  // bits-per-pixel
-	serverInit[5] = 24  // depth (24-bit color)
-	serverInit[6] = 0   // big-endian-flag (little-endian)
-	serverInit[7] = 1   // true-colour-flag
-	// Color component max values (16-bit big-endian)
-	serverInit[8] = 0   // red-max high byte (0x00)
-	serverInit[9] = 255 // red-max low byte (0xFF) -> 0x00FF = 255
-	serverInit[10] = 0  // green-max high byte (0x00)
-	serverInit[11] = 255 // green-max low byte (0xFF) -> 0x00FF = 255
-	serverInit[12] = 0  // blue-max high byte (0x00)
-	serverInit[13] = 255 // blue-max low byte (0xFF) -> 0x00FF = 255
-	// Color component bit shifts
-	serverInit[14] = 16 // red-shift (bits 16-23)
-	serverInit[15] = 8  // green-shift (bits 8-15)
-	serverInit[16] = 0  // blue-shift (bits 0-7)
-	// padding (3 bytes)
-	serverInit[17] = 0
-	serverInit[18] = 0  
-	serverInit[19] = 0
-	// name-length (32-bit big-endian)
-	nameLength := 4
-	serverInit[20] = byte(nameLength >> 24)
-	serverInit[21] = byte((nameLength >> 16) & 0xFF)
-	serverInit[22] = byte((nameLength >> 8) & 0xFF)
-	serverInit[23] = byte(nameLength & 0xFF)
-
-	if _, err := conn.Write(serverInit); err != nil {
-		return fmt.Errorf("failed to send server init: %v", err)
+	serverInit := rfb.ServerInit{
+		Width:       SCREEN_WIDTH,
+		Height:      SCREEN_HEIGHT,
+		PixelFormat: rfb.DefaultPixelFormat(),
+		Name:        "Test",
 	}
-	log.Printf("Sent ServerInit: %v", serverInit)
 
-	// Send server name
-	serverName := []byte("Test")
-	if _, err := conn.Write(serverName); err != nil {
-		return fmt.Errorf("failed to send server name: %v", err)
+	if err := rfb.SendServerInit(conn, serverInit); err != nil {
+		return fmt.Errorf("failed to send server init: %v", err)
 	}
 
 	return nil
@@ -335,30 +276,14 @@ func doVNCHandshake(conn net.Conn) error {
 
 // getMessageLength returns the expected length of a VNC client message based on its type
 func getMessageLength(messageType byte, data []byte) (int, error) {
-	switch messageType {
-	case 0: // SetPixelFormat
-		return 20, nil
-	case 2: // SetEncodings
-		if len(data) < 4 {
-			return -1, nil // Need more data to determine length
-		}
-		numEncodings := (int(data[2]) << 8) | int(data[3])
-		return 4 + numEncodings*4, nil
-	case 3: // FramebufferUpdateRequest
-		return 10, nil
-	case 4: // KeyEvent
-		return 8, nil
-	case 5: // PointerEvent
-		return 6, nil
-	case 6: // ClientCutText
-		if len(data) < 8 {
-			return -1, nil // Need more data to determine length
-		}
-		textLength := (int(data[4]) << 24) | (int(data[5]) << 16) | (int(data[6]) << 8) | int(data[7])
-		return 8 + textLength, nil
-	default:
-		return -1, fmt.Errorf("unknown message type: %d", messageType)
+	length, err := rfb.GetMessageLength(messageType, data)
+	if err != nil {
+		return -1, err
 	}
+	if length == 0 && len(data) < 8 {
+		return -1, nil // Need more data to determine length
+	}
+	return length, nil
 }
 
 // processCompleteMessages processes all complete messages in the buffer
@@ -412,28 +337,28 @@ func handleVNCMessage(vncConn *VNCConnection, data []byte) error {
 	log.Printf("Processing complete message type %d (%d bytes)", messageType, len(data))
 	
 	switch messageType {
-	case 0: // SetPixelFormat (20 bytes total)
+	case rfb.SetPixelFormat: // SetPixelFormat (20 bytes total)
 		return handleSetPixelFormat(vncConn, data)
 		
-	case 2: // SetEncodings (variable length)
+	case rfb.SetEncodings: // SetEncodings (variable length)
 		numEncodings := (int(data[2]) << 8) | int(data[3])
 		log.Printf("Received SetEncodings message with %d encodings", numEncodings)
 		return nil
 		
-	case 3: // FramebufferUpdateRequest (10 bytes total)
+	case rfb.FramebufferUpdateRequest: // FramebufferUpdateRequest (10 bytes total)
 		log.Printf("Received FramebufferUpdateRequest message")
 		sendFramebufferUpdate(vncConn)
 		return nil
 		
-	case 4: // KeyEvent (8 bytes total)
+	case rfb.KeyEvent: // KeyEvent (8 bytes total)
 		log.Printf("Received KeyEvent message")
 		return nil
 		
-	case 5: // PointerEvent (6 bytes total)
+	case rfb.PointerEvent: // PointerEvent (6 bytes total)
 		log.Printf("Received PointerEvent message")
 		return nil
 		
-	case 6: // ClientCutText (variable length)
+	case rfb.ClientCutText: // ClientCutText (variable length)
 		textLength := (int(data[4]) << 24) | (int(data[5]) << 16) | (int(data[6]) << 8) | int(data[7])
 		log.Printf("Received ClientCutText message with %d bytes of text", textLength)
 		return nil
@@ -445,122 +370,25 @@ func handleVNCMessage(vncConn *VNCConnection, data []byte) error {
 }
 
 func handleSetPixelFormat(vncConn *VNCConnection, data []byte) error {
-	if len(data) != 20 {
-		return fmt.Errorf("SetPixelFormat message must be exactly 20 bytes, got %d", len(data))
-	}
-	
-	// Parse pixel format from bytes 1-19 (skip message type byte 0)
-	// Structure: 3 padding bytes + 16 bytes of pixel format
-	pf := PixelFormat{
-		bitsPerPixel:   data[4],  // byte 4
-		depth:          data[5],  // byte 5
-		bigEndianFlag:  data[6],  // byte 6
-		trueColorFlag:  data[7],  // byte 7
-		redMax:         uint16(data[8])<<8 | uint16(data[9]),    // bytes 8-9
-		greenMax:       uint16(data[10])<<8 | uint16(data[11]),  // bytes 10-11
-		blueMax:        uint16(data[12])<<8 | uint16(data[13]),  // bytes 12-13
-		redShift:       data[14], // byte 14
-		greenShift:     data[15], // byte 15
-		blueShift:      data[16], // byte 16
+	pf, err := rfb.ParseSetPixelFormat(data)
+	if err != nil {
+		return err
 	}
 	
 	// Update connection's pixel format
 	vncConn.pixelFormat = pf
 	
 	log.Printf("SetPixelFormat: %d bpp, depth %d, %s-endian, true-color=%d", 
-		pf.bitsPerPixel, pf.depth, 
-		map[uint8]string{0: "little", 1: "big"}[pf.bigEndianFlag],
-		pf.trueColorFlag)
+		pf.BitsPerPixel, pf.Depth, 
+		map[uint8]string{0: "little", 1: "big"}[pf.BigEndianFlag],
+		pf.TrueColorFlag)
 	log.Printf("Color maximums: R=%d G=%d B=%d, Shifts: R=%d G=%d B=%d",
-		pf.redMax, pf.greenMax, pf.blueMax,
-		pf.redShift, pf.greenShift, pf.blueShift)
+		pf.RedMax, pf.GreenMax, pf.BlueMax,
+		pf.RedShift, pf.GreenShift, pf.BlueShift)
 	
 	return nil
 }
 
-// convertPixelFormat converts BGRA pixel data to the client's requested pixel format
-func convertPixelFormat(bgraData []byte, width, height int, targetFormat PixelFormat) []byte {
-	// If target format matches our default (32bpp BGRA), no conversion needed
-	if targetFormat.bitsPerPixel == 32 && 
-	   targetFormat.depth == 24 &&
-	   targetFormat.bigEndianFlag == 0 &&
-	   targetFormat.trueColorFlag == 1 &&
-	   targetFormat.redMax == 255 &&
-	   targetFormat.greenMax == 255 &&
-	   targetFormat.blueMax == 255 &&
-	   targetFormat.redShift == 16 &&
-	   targetFormat.greenShift == 8 &&
-	   targetFormat.blueShift == 0 {
-		return bgraData
-	}
-	
-	pixelCount := width * height
-	bytesPerPixel := int(targetFormat.bitsPerPixel) / 8
-	outputData := make([]byte, pixelCount * bytesPerPixel)
-	
-	for i := 0; i < pixelCount; i++ {
-		// Extract BGRA components from input
-		srcOffset := i * 4
-		b := uint16(bgraData[srcOffset])
-		g := uint16(bgraData[srcOffset+1])
-		r := uint16(bgraData[srcOffset+2])
-		// a := uint16(bgraData[srcOffset+3]) // Alpha not used in conversion
-		
-		// Scale color components to target maximums
-		scaledR := (r * targetFormat.redMax) / 255
-		scaledG := (g * targetFormat.greenMax) / 255
-		scaledB := (b * targetFormat.blueMax) / 255
-		
-		// Combine into target pixel value
-		pixelValue := uint32(scaledR) << targetFormat.redShift |
-					  uint32(scaledG) << targetFormat.greenShift |
-					  uint32(scaledB) << targetFormat.blueShift
-		
-		// Write pixel in target format
-		dstOffset := i * bytesPerPixel
-		writePixelValue(outputData[dstOffset:dstOffset+bytesPerPixel], pixelValue, targetFormat.bigEndianFlag)
-	}
-	
-	return outputData
-}
-
-// writePixelValue writes a pixel value to the buffer in the specified endianness
-func writePixelValue(buffer []byte, value uint32, bigEndian uint8) {
-	switch len(buffer) {
-	case 1: // 8 bits per pixel
-		buffer[0] = uint8(value)
-	case 2: // 16 bits per pixel
-		if bigEndian == 1 {
-			buffer[0] = uint8(value >> 8)
-			buffer[1] = uint8(value)
-		} else {
-			buffer[0] = uint8(value)
-			buffer[1] = uint8(value >> 8)
-		}
-	case 3: // 24 bits per pixel
-		if bigEndian == 1 {
-			buffer[0] = uint8(value >> 16)
-			buffer[1] = uint8(value >> 8)
-			buffer[2] = uint8(value)
-		} else {
-			buffer[0] = uint8(value)
-			buffer[1] = uint8(value >> 8)
-			buffer[2] = uint8(value >> 16)
-		}
-	case 4: // 32 bits per pixel
-		if bigEndian == 1 {
-			buffer[0] = uint8(value >> 24)
-			buffer[1] = uint8(value >> 16)
-			buffer[2] = uint8(value >> 8)
-			buffer[3] = uint8(value)
-		} else {
-			buffer[0] = uint8(value)
-			buffer[1] = uint8(value >> 8)
-			buffer[2] = uint8(value >> 16)
-			buffer[3] = uint8(value >> 24)
-		}
-	}
-}
 
 func sendFramebufferUpdate(vncConn *VNCConnection) {
 	// Send a simple framebuffer update (solid color rectangle)
@@ -595,7 +423,7 @@ func sendFramebufferUpdate(vncConn *VNCConnection) {
 	bgraData := generateAnimationFrame(vncConn.animationType, vncConn.frameNumber, SCREEN_WIDTH, SCREEN_HEIGHT)
 	
 	// Convert to client's requested pixel format
-	pixelData := convertPixelFormat(bgraData, SCREEN_WIDTH, SCREEN_HEIGHT, vncConn.pixelFormat)
+	pixelData := rfb.ConvertPixelFormat(bgraData, SCREEN_WIDTH, SCREEN_HEIGHT, vncConn.pixelFormat)
 	log.Printf("Sending pixel data: %d bytes (converted from BGRA to client format), first 16 bytes: %v", len(pixelData), pixelData[:16])
 
 	if _, err := vncConn.conn.Write(pixelData); err != nil {

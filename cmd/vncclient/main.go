@@ -14,12 +14,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/coder/websockify/rfb"
 	"github.com/coder/websockify/viewer"
 )
 
-const (
-	RFB_VERSION = "RFB 003.008\n"
-)
 
 type VNCClient struct {
 	conn            net.Conn
@@ -36,30 +34,9 @@ type VNCClient struct {
 	capturedFrames  []*image.RGBA // Store frames for animation
 	viewer          *viewer.FramebufferViewer
 	showGUI         bool
-	serverPixelFormat PixelFormat // Server's pixel format from handshake
+	serverPixelFormat rfb.PixelFormat // Server's pixel format from handshake
 }
 
-type ServerInit struct {
-	Width      uint16
-	Height     uint16
-	PixelFormat PixelFormat
-	NameLength uint32
-	Name       string
-}
-
-type PixelFormat struct {
-	BitsPerPixel  uint8
-	Depth         uint8
-	BigEndianFlag uint8
-	TrueColorFlag uint8
-	RedMax        uint16
-	GreenMax      uint16
-	BlueMax       uint16
-	RedShift      uint8
-	GreenShift    uint8
-	BlueShift     uint8
-	Padding       [3]uint8
-}
 
 func main() {
 	var (
@@ -175,18 +152,7 @@ func runVNCClient(config VNCConfig, guiViewer *viewer.FramebufferViewer) {
 	// Test SetPixelFormat if requested
 	if config.testPixelFormat {
 		// Send a 16bpp RGB565 pixel format
-		testFormat := PixelFormat{
-			BitsPerPixel:  16,
-			Depth:         16,
-			BigEndianFlag: 0, // little-endian
-			TrueColorFlag: 1,
-			RedMax:        31,  // 5 bits
-			GreenMax:      63,  // 6 bits
-			BlueMax:       31,  // 5 bits
-			RedShift:      11,  // bits 11-15
-			GreenShift:    5,   // bits 5-10
-			BlueShift:     0,   // bits 0-4
-		}
+		testFormat := rfb.RGB565PixelFormat()
 		log.Printf("Sending test SetPixelFormat message (16bpp RGB565)")
 		if err := client.sendSetPixelFormat(testFormat); err != nil {
 			log.Printf("Failed to send SetPixelFormat: %v", err)
@@ -249,38 +215,33 @@ func runVNCClient(config VNCConfig, guiViewer *viewer.FramebufferViewer) {
 
 func (c *VNCClient) handshake() error {
 	// Read server version
-	serverVersion := make([]byte, 12)
-	if _, err := io.ReadFull(c.conn, serverVersion); err != nil {
+	serverVersion, err := rfb.ReadRFBVersion(c.conn)
+	if err != nil {
 		return fmt.Errorf("failed to read server version: %v", err)
 	}
-	log.Printf("Server version: %s", string(serverVersion))
+	log.Printf("Server version: %s", serverVersion)
 
 	// Send client version
-	if _, err := c.conn.Write([]byte(RFB_VERSION)); err != nil {
+	if err := rfb.SendRFBVersion(c.conn); err != nil {
 		return fmt.Errorf("failed to send client version: %v", err)
 	}
 
 	// Read security types
-	var numSecurityTypes uint8
-	if err := binary.Read(c.conn, binary.BigEndian, &numSecurityTypes); err != nil {
-		return fmt.Errorf("failed to read security types count: %v", err)
-	}
-
-	securityTypes := make([]uint8, numSecurityTypes)
-	if _, err := io.ReadFull(c.conn, securityTypes); err != nil {
+	securityTypes, err := rfb.ReadSecurityTypes(c.conn)
+	if err != nil {
 		return fmt.Errorf("failed to read security types: %v", err)
 	}
 	log.Printf("Available security types: %v", securityTypes)
 
 	// Choose security type (1 = None)
-	securityChoice := uint8(1)
+	securityChoice := uint8(rfb.SecurityNone)
 	if err := binary.Write(c.conn, binary.BigEndian, securityChoice); err != nil {
 		return fmt.Errorf("failed to send security choice: %v", err)
 	}
 
 	// Read security result
-	var securityResult uint32
-	if err := binary.Read(c.conn, binary.BigEndian, &securityResult); err != nil {
+	securityResult, err := rfb.ReadSecurityResult(c.conn)
+	if err != nil {
 		return fmt.Errorf("failed to read security result: %v", err)
 	}
 	if securityResult != 0 {
@@ -294,25 +255,10 @@ func (c *VNCClient) handshake() error {
 	}
 
 	// Read ServerInit
-	var serverInit ServerInit
-	if err := binary.Read(c.conn, binary.BigEndian, &serverInit.Width); err != nil {
-		return fmt.Errorf("failed to read width: %v", err)
+	serverInit, err := rfb.ReadServerInit(c.conn)
+	if err != nil {
+		return fmt.Errorf("failed to read server init: %v", err)
 	}
-	if err := binary.Read(c.conn, binary.BigEndian, &serverInit.Height); err != nil {
-		return fmt.Errorf("failed to read height: %v", err)
-	}
-	if err := binary.Read(c.conn, binary.BigEndian, &serverInit.PixelFormat); err != nil {
-		return fmt.Errorf("failed to read pixel format: %v", err)
-	}
-	if err := binary.Read(c.conn, binary.BigEndian, &serverInit.NameLength); err != nil {
-		return fmt.Errorf("failed to read name length: %v", err)
-	}
-
-	nameBytes := make([]byte, serverInit.NameLength)
-	if _, err := io.ReadFull(c.conn, nameBytes); err != nil {
-		return fmt.Errorf("failed to read server name: %v", err)
-	}
-	serverInit.Name = string(nameBytes)
 
 	c.width = int(serverInit.Width)
 	c.height = int(serverInit.Height)
@@ -331,40 +277,8 @@ func (c *VNCClient) handshake() error {
 }
 
 // sendSetPixelFormat sends a SetPixelFormat message to the server
-func (c *VNCClient) sendSetPixelFormat(pf PixelFormat) error {
-	msg := make([]byte, 20)
-	
-	// Message type (0 = SetPixelFormat)
-	msg[0] = 0
-	
-	// 3 bytes of padding (bytes 1-3)
-	msg[1] = 0
-	msg[2] = 0
-	msg[3] = 0
-	
-	// Pixel format (16 bytes starting at byte 4)
-	msg[4] = pf.BitsPerPixel
-	msg[5] = pf.Depth
-	msg[6] = pf.BigEndianFlag
-	msg[7] = pf.TrueColorFlag
-	
-	// Color maximums (16-bit big-endian)
-	msg[8] = uint8(pf.RedMax >> 8)
-	msg[9] = uint8(pf.RedMax & 0xFF)
-	msg[10] = uint8(pf.GreenMax >> 8)
-	msg[11] = uint8(pf.GreenMax & 0xFF)
-	msg[12] = uint8(pf.BlueMax >> 8)
-	msg[13] = uint8(pf.BlueMax & 0xFF)
-	
-	// Color shifts
-	msg[14] = pf.RedShift
-	msg[15] = pf.GreenShift
-	msg[16] = pf.BlueShift
-	
-	// 3 bytes of padding (bytes 17-19)
-	msg[17] = 0
-	msg[18] = 0
-	msg[19] = 0
+func (c *VNCClient) sendSetPixelFormat(pf rfb.PixelFormat) error {
+	msg := rfb.CreateSetPixelFormat(pf)
 	
 	if _, err := c.conn.Write(msg); err != nil {
 		return fmt.Errorf("failed to send SetPixelFormat message: %v", err)
@@ -380,7 +294,7 @@ func (c *VNCClient) sendSetPixelFormat(pf PixelFormat) error {
 
 func (c *VNCClient) requestFramebufferUpdate(incremental bool, x, y, width, height uint16) error {
 	msg := make([]byte, 10)
-	msg[0] = 3 // FramebufferUpdateRequest
+	msg[0] = rfb.FramebufferUpdateRequest
 	if incremental {
 		msg[1] = 1
 	} else {
@@ -409,15 +323,15 @@ func (c *VNCClient) handleMessage() error {
 	c.conn.SetReadDeadline(time.Time{}) // Clear deadline
 
 	switch messageType {
-	case 0: // FramebufferUpdate
+	case rfb.FramebufferUpdate: // FramebufferUpdate
 		return c.handleFramebufferUpdate()
-	case 1: // SetColorMapEntries
+	case rfb.SetColorMapEntries: // SetColorMapEntries
 		log.Printf("Received SetColorMapEntries (not implemented)")
 		return c.skipMessage(6) // Skip the rest of the message
-	case 2: // Bell
+	case rfb.Bell: // Bell
 		log.Printf("Received Bell")
 		return nil
-	case 3: // ServerCutText
+	case rfb.ServerCutText: // ServerCutText
 		return c.handleServerCutText()
 	default:
 		log.Printf("Unknown message type: %d", messageType)
@@ -508,7 +422,7 @@ func (c *VNCClient) handleRawRectangle(x, y, width, height int) error {
 		for col := 0; col < width; col++ {
 			pixelOffset := (row*width + col) * bytesPerPixel
 			if pixelOffset+bytesPerPixel <= len(pixelData) {
-				rgba := c.convertPixelToRGBA(pixelData[pixelOffset:pixelOffset+bytesPerPixel])
+				rgba := rfb.ConvertPixelToRGBA(pixelData[pixelOffset:pixelOffset+bytesPerPixel], c.serverPixelFormat)
 				c.framebuffer.Set(x+col, y+row, rgba)
 			}
 		}
@@ -517,55 +431,6 @@ func (c *VNCClient) handleRawRectangle(x, y, width, height int) error {
 	return nil
 }
 
-// convertPixelToRGBA converts a pixel from the server's format to RGBA
-func (c *VNCClient) convertPixelToRGBA(pixelBytes []byte) color.RGBA {
-	pf := c.serverPixelFormat
-	
-	// Read pixel value from bytes considering endianness
-	var pixelValue uint32
-	switch len(pixelBytes) {
-	case 1: // 8 bits per pixel
-		pixelValue = uint32(pixelBytes[0])
-	case 2: // 16 bits per pixel
-		if pf.BigEndianFlag == 1 {
-			pixelValue = uint32(pixelBytes[0])<<8 | uint32(pixelBytes[1])
-		} else {
-			pixelValue = uint32(pixelBytes[1])<<8 | uint32(pixelBytes[0])
-		}
-	case 3: // 24 bits per pixel
-		if pf.BigEndianFlag == 1 {
-			pixelValue = uint32(pixelBytes[0])<<16 | uint32(pixelBytes[1])<<8 | uint32(pixelBytes[2])
-		} else {
-			pixelValue = uint32(pixelBytes[2])<<16 | uint32(pixelBytes[1])<<8 | uint32(pixelBytes[0])
-		}
-	case 4: // 32 bits per pixel
-		if pf.BigEndianFlag == 1 {
-			pixelValue = uint32(pixelBytes[0])<<24 | uint32(pixelBytes[1])<<16 | uint32(pixelBytes[2])<<8 | uint32(pixelBytes[3])
-		} else {
-			pixelValue = uint32(pixelBytes[3])<<24 | uint32(pixelBytes[2])<<16 | uint32(pixelBytes[1])<<8 | uint32(pixelBytes[0])
-		}
-	}
-	
-	// Extract color components using shifts and maximums
-	redBits := (pixelValue >> pf.RedShift) & uint32(pf.RedMax)
-	greenBits := (pixelValue >> pf.GreenShift) & uint32(pf.GreenMax)
-	blueBits := (pixelValue >> pf.BlueShift) & uint32(pf.BlueMax)
-	
-	// Scale to 8-bit values
-	var r, g, b uint8
-	if pf.RedMax > 0 {
-		r = uint8((redBits * 255) / uint32(pf.RedMax))
-	}
-	if pf.GreenMax > 0 {
-		g = uint8((greenBits * 255) / uint32(pf.GreenMax))
-	}
-	if pf.BlueMax > 0 {
-		b = uint8((blueBits * 255) / uint32(pf.BlueMax))
-	}
-	
-	// For simplicity, assume full opacity (alpha = 255)
-	return color.RGBA{R: r, G: g, B: b, A: 255}
-}
 
 func (c *VNCClient) handleServerCutText() error {
 	var padding [3]uint8

@@ -18,7 +18,7 @@ The VNC client is a test application that implements RFB protocol client functio
 ## Usage
 
 ```bash
-./vncclient [OPTIONS]
+bin/vncclient [OPTIONS]
 ```
 
 ### Command Line Options
@@ -44,7 +44,7 @@ The VNC client is a test application that implements RFB protocol client functio
 Connect to VNC server and display for 10 seconds:
 
 ```bash
-./vncclient -host localhost:5900
+bin/vncclient -host localhost:5900
 ```
 
 ### Frame Capture Testing
@@ -52,7 +52,7 @@ Connect to VNC server and display for 10 seconds:
 Capture frames during VNC session:
 
 ```bash
-./vncclient -host localhost:5900 -capture -output ./test-frames -duration 15
+bin/vncclient -host localhost:5900 -capture -output ./test-frames -duration 15
 ```
 
 ### GUI Viewer with Transparency
@@ -60,7 +60,7 @@ Capture frames during VNC session:
 Show framebuffer with checkerboard background:
 
 ```bash
-./vncclient -host localhost:5900 -gui -checkerboard
+bin/vncclient -host localhost:5900 -gui -checkerboard
 ```
 
 ### Animation Generation
@@ -68,7 +68,7 @@ Show framebuffer with checkerboard background:
 Create both APNG and WebM animations:
 
 ```bash
-./vncclient -host localhost:5900 -capture -webm -apng -fps 5 -duration 10
+bin/vncclient -host localhost:5900 -capture -webm -apng -fps 5 -duration 10
 ```
 
 ### Testing Through Websockify
@@ -76,7 +76,7 @@ Create both APNG and WebM animations:
 Connect to VNC server through websockify proxy:
 
 ```bash
-./vncclient -host localhost:8080 -duration 15
+bin/vncclient -host localhost:8080 -duration 15
 ```
 
 ### Pixel Format Testing
@@ -84,7 +84,7 @@ Connect to VNC server through websockify proxy:
 Test custom pixel format negotiation:
 
 ```bash
-./vncclient -host localhost:5900 -test-pixel-format -gui
+bin/vncclient -host localhost:5900 -test-pixel-format -gui
 ```
 
 ## Testing Workflows
@@ -93,17 +93,17 @@ Test custom pixel format negotiation:
 
 1. **Start VNC server:**
    ```bash
-   ./vncserver -port 5900 -gui
+   bin/vncserver -port 5900 -gui
    ```
 
 2. **Start websockify proxy:**
    ```bash
-   ./websockify -listen :8080 -target localhost:5900
+   bin/websockify -listen :8080 -target localhost:5900
    ```
 
 3. **Test with VNC client:**
    ```bash
-   ./vncclient -host localhost:8080 -gui
+   bin/vncclient -host localhost:8080 -gui
    ```
 
 ### Framebuffer Capture Testing
@@ -112,7 +112,7 @@ Capture and analyze frames during VNC session:
 
 ```bash
 # Connect with frame capture
-./vncclient -host localhost:5900 -capture -output ./test_output -duration 10
+bin/vncclient -host localhost:5900 -capture -output ./test_output -duration 10
 
 # Inspect captured frames
 ls -la test_output/
@@ -125,10 +125,10 @@ Compare server and client framebuffers in real-time:
 
 ```bash
 # Terminal 1: Server with GUI viewer
-./vncserver -port 5900 -gui
+bin/vncserver -port 5900 -gui
 
 # Terminal 2: Client with GUI viewer  
-./vncclient -host localhost:5900 -gui
+bin/vncclient -host localhost:5900 -gui
 ```
 
 ## Protocol Implementation
@@ -256,7 +256,7 @@ Test different pixel formats for compatibility:
 
 ```bash
 # Test 16bpp RGB565 format
-./vncclient -host localhost:5900 -test-pixel-format -capture
+bin/vncclient -host localhost:5900 -test-pixel-format -capture
 ```
 
 ### Long-running Tests
@@ -265,7 +265,7 @@ Extended testing sessions:
 
 ```bash
 # Run for 5 minutes with periodic captures
-./vncclient -host localhost:5900 -duration 300 -capture -fps 1
+bin/vncclient -host localhost:5900 -duration 300 -capture -fps 1
 ```
 
 ### Multi-format Output
@@ -273,7 +273,7 @@ Extended testing sessions:
 Generate multiple output formats simultaneously:
 
 ```bash
-./vncclient -host localhost:5900 -capture -webm -apng -checkerboard -gui -fps 3
+bin/vncclient -host localhost:5900 -capture -webm -apng -checkerboard -gui -fps 3
 ```
 
 This enables comprehensive testing and analysis of VNC protocol implementations across different scenarios and configurations.

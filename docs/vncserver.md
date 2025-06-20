@@ -17,7 +17,7 @@ The VNC server is a test application that implements a basic VNC/RFB protocol se
 ## Usage
 
 ```bash
-./vncserver [OPTIONS]
+bin/vncserver [OPTIONS]
 ```
 
 ### Command Line Options
@@ -45,7 +45,7 @@ The VNC server is a test application that implements a basic VNC/RFB protocol se
 Start a VNC server on the default port (5900):
 
 ```bash
-./vncserver
+bin/vncserver
 ```
 
 ### Server with GUI Viewer
@@ -53,7 +53,7 @@ Start a VNC server on the default port (5900):
 Start server with real-time framebuffer display:
 
 ```bash
-./vncserver -gui
+bin/vncserver -gui
 ```
 
 ### Custom Animation and Port
@@ -61,7 +61,7 @@ Start server with real-time framebuffer display:
 Start server with plasma animation on port 5901:
 
 ```bash
-./vncserver -port 5901 -animation plasma
+bin/vncserver -port 5901 -animation plasma
 ```
 
 ### High Frame Rate Testing
@@ -69,7 +69,7 @@ Start server with plasma animation on port 5901:
 Start server with high frame rate for performance testing:
 
 ```bash
-./vncserver -gui -fps 60
+bin/vncserver -gui -fps 60
 ```
 
 ## Testing with Websockify
@@ -78,17 +78,17 @@ Start server with high frame rate for performance testing:
 
 1. Start the VNC server:
    ```bash
-   ./vncserver -port 5900
+   bin/vncserver -port 5900
    ```
 
 2. Start websockify proxy:
    ```bash
-   ./websockify -listen :8080 -target localhost:5900
+   bin/websockify -listen :8080 -target localhost:5900
    ```
 
 3. Connect VNC client through websockify:
    ```bash
-   ./vncclient -host localhost:8080
+   bin/vncclient -host localhost:8080
    ```
 
 ### Visual Comparison Testing
@@ -97,13 +97,13 @@ Use GUI viewers on both server and client for side-by-side comparison:
 
 ```bash
 # Terminal 1: Server with GUI
-./vncserver -port 5900 -gui
+bin/vncserver -port 5900 -gui
 
 # Terminal 2: Websockify proxy  
-./websockify -listen :8080 -target localhost:5900
+bin/websockify -listen :8080 -target localhost:5900
 
 # Terminal 3: Client with GUI
-./vncclient -host localhost:8080 -gui
+bin/vncclient -host localhost:8080 -gui
 ```
 
 ## Protocol Implementation

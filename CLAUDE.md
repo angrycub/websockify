@@ -39,13 +39,13 @@ Direct Go commands are also available:
 
 ```bash
 # Build the standalone executable
-go build -o websockify ./cmd/websockify
+go build -o bin/websockify ./cmd/websockify
 
 # Run from source
 go run ./cmd/websockify -listen :8080 -target localhost:5900
 
 # Show help
-./websockify -help
+bin/websockify -help
 ```
 
 ## Architecture
@@ -107,19 +107,19 @@ The repository includes test servers for integration testing websockify:
 1. **Start VNC server:**
    ```bash
    # Terminal 1: Start mock VNC server with GUI viewer
-   ./vncserver -port 5900 -gui
+   bin/vncserver -port 5900 -gui
    ```
 
 2. **Start websockify proxy:**
    ```bash
    # Terminal 2: Start websockify pointing to VNC server
-   ./websockify -listen :8080 -target localhost:5900
+   bin/websockify -listen :8080 -target localhost:5900
    ```
 
 3. **Test with VNC client:**
    ```bash
    # Terminal 3: Connect VNC client with GUI viewer for side-by-side comparison
-   ./vncclient -host localhost:5900 -gui
+   bin/vncclient -host localhost:5900 -gui
    ```
 
 This setup allows you to visually compare what the server is generating versus what the client is receiving to ensure coherence.
@@ -129,7 +129,7 @@ This setup allows you to visually compare what the server is generating versus w
 1. **Capture frames during VNC session:**
    ```bash
    # Connect VNC client with frame capture enabled
-   ./vncclient -host localhost:5900 -capture -output ./test_output -duration 10
+   bin/vncclient -host localhost:5900 -capture -output ./test_output -duration 10
    ```
 
 2. **Inspect captured frames:**
@@ -160,23 +160,23 @@ make build-servers  # Build echo and VNC servers
 make build-client   # Build VNC client
 
 # Run servers on custom ports
-./echoserver -port 5901
-./vncserver -port 5900
-./vncserver -port 5900 -gui                              # With GUI viewer
-./vncserver -port 5900 -animation plasma -gui            # Different animation with GUI
-./vncserver -port 5900 -gui -fps 60                      # High frame rate GUI
-./vncserver -port 5900 -gui -fps 5                       # Low frame rate GUI
+bin/echoserver -port 5901
+bin/vncserver -port 5900
+bin/vncserver -port 5900 -gui                              # With GUI viewer
+bin/vncserver -port 5900 -animation plasma -gui            # Different animation with GUI
+bin/vncserver -port 5900 -gui -fps 60                      # High frame rate GUI
+bin/vncserver -port 5900 -gui -fps 5                       # Low frame rate GUI
 
 # Run VNC client with various options
-./vncclient -host localhost:5900                                   # Basic connection
-./vncclient -host localhost:5900 -capture -output ./test_output    # With frame capture
-./vncclient -host localhost:5900 -gui                              # With GUI viewer
-./vncclient -host localhost:5900 -gui -checkerboard               # GUI with transparency visualization
-./vncclient -host localhost:8080 -duration 15                      # Through websockify
+bin/vncclient -host localhost:5900                                   # Basic connection
+bin/vncclient -host localhost:5900 -capture -output ./test_output    # With frame capture
+bin/vncclient -host localhost:5900 -gui                              # With GUI viewer
+bin/vncclient -host localhost:5900 -gui -checkerboard               # GUI with transparency visualization
+bin/vncclient -host localhost:8080 -duration 15                      # Through websockify
 
 # Test websockify configurations
-./websockify -listen :8080 -target localhost:5901  # Echo server
-./websockify -listen :8080 -target localhost:5900  # VNC server
+bin/websockify -listen :8080 -target localhost:5901  # Echo server
+bin/websockify -listen :8080 -target localhost:5900  # VNC server
 ```
 
 ### Programmatic Testing

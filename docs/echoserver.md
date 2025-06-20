@@ -17,7 +17,7 @@ The echo server is a lightweight TCP server that echoes back all received data. 
 ## Usage
 
 ```bash
-./echoserver [OPTIONS]
+bin/echoserver [OPTIONS]
 ```
 
 ### Command Line Options
@@ -34,7 +34,7 @@ The echo server is a lightweight TCP server that echoes back all received data. 
 Start echo server on default port (5901):
 
 ```bash
-./echoserver
+bin/echoserver
 ```
 
 ### Custom Port
@@ -42,7 +42,7 @@ Start echo server on default port (5901):
 Start echo server on port 8000:
 
 ```bash
-./echoserver -port 8000
+bin/echoserver -port 8000
 ```
 
 ## Testing with Websockify
@@ -53,12 +53,12 @@ Test websockify proxy functionality with simple echo protocol:
 
 1. **Start echo server:**
    ```bash
-   ./echoserver -port 5901
+   bin/echoserver -port 5901
    ```
 
 2. **Start websockify proxy:**
    ```bash
-   ./websockify -listen :8080 -target localhost:5901
+   bin/websockify -listen :8080 -target localhost:5901
    ```
 
 3. **Test with WebSocket client:**
@@ -142,11 +142,11 @@ Example test script:
 ```bash
 #!/bin/bash
 # Start echo server in background
-./echoserver -port 5901 &
+bin/echoserver -port 5901 &
 ECHO_PID=$!
 
 # Start websockify proxy
-./websockify -listen :8080 -target localhost:5901 &
+bin/websockify -listen :8080 -target localhost:5901 &
 PROXY_PID=$!
 
 # Wait for services to start
@@ -223,9 +223,9 @@ The echo server logs:
 Run multiple echo servers for load testing:
 
 ```bash
-./echoserver -port 5901 &
-./echoserver -port 5902 &
-./echoserver -port 5903 &
+bin/echoserver -port 5901 &
+bin/echoserver -port 5902 &
+bin/echoserver -port 5903 &
 ```
 
 ### Docker Integration

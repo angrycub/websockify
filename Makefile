@@ -1,23 +1,25 @@
 .PHONY: build clean install run test fmt vet deps help build-servers run-echo run-vnc build-client run-client
 
-# Binary names
-BINARY_NAME=websockify
+# Binary names and directories
+BIN_DIR=bin
+BINARY_NAME=$(BIN_DIR)/websockify
 CMD_DIR=./cmd/websockify
-ECHO_BINARY=echoserver
-VNC_BINARY=vncserver
-VNC_CLIENT_BINARY=vncclient
+ECHO_BINARY=$(BIN_DIR)/echoserver
+VNC_BINARY=$(BIN_DIR)/vncserver
+VNC_CLIENT_BINARY=$(BIN_DIR)/vncclient
 
 # Default target
 all: build
 
 # Build the binary
 build:
+	mkdir -p $(BIN_DIR)
 	go build -o $(BINARY_NAME) $(CMD_DIR)
 
 # Clean build artifacts
 clean:
 	go clean
-	rm -f $(BINARY_NAME) $(ECHO_BINARY) $(VNC_BINARY) $(VNC_CLIENT_BINARY)
+	rm -rf $(BIN_DIR)
 	rm -rf frames/ test-frames/
 
 # Install to $GOPATH/bin
@@ -47,11 +49,13 @@ deps:
 
 # Build test servers
 build-servers:
+	mkdir -p $(BIN_DIR)
 	go build -o $(ECHO_BINARY) ./cmd/echoserver
 	go build -o $(VNC_BINARY) ./cmd/vncserver
 
 # Build VNC client
 build-client:
+	mkdir -p $(BIN_DIR)
 	go build -o $(VNC_CLIENT_BINARY) ./cmd/vncclient
 
 # Run echo server (for websockify testing)

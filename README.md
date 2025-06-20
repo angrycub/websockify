@@ -25,7 +25,7 @@ git clone https://github.com/angrycub/websockify.git
 cd websockify
 
 # Build the application
-go build -o websockify ./cmd/websockify
+go build -o bin/websockify ./cmd/websockify
 
 # Or use the Makefile
 make build
@@ -38,7 +38,7 @@ Check the [releases page](https://github.com/angrycub/websockify/releases) for p
 ## Usage
 
 ```bash
-./websockify [OPTIONS]
+bin/websockify [OPTIONS]
 ```
 
 ### Command Line Options
@@ -59,7 +59,7 @@ Proxy VNC connections through WebSocket:
 ```bash
 # Start VNC server on port 5900
 # Then start websockify proxy
-./websockify -listen :8080 -target localhost:5900
+bin/websockify -listen :8080 -target localhost:5900
 ```
 
 #### SSH Proxy
@@ -67,7 +67,7 @@ Proxy VNC connections through WebSocket:
 Proxy SSH connections:
 
 ```bash
-./websockify -listen :8080 -target localhost:22
+bin/websockify -listen :8080 -target localhost:22
 ```
 
 #### Custom Addresses
@@ -75,7 +75,7 @@ Proxy SSH connections:
 Use custom listener and target addresses:
 
 ```bash
-./websockify -listen 0.0.0.0:9000 -target remote-host:5900
+bin/websockify -listen 0.0.0.0:9000 -target remote-host:5900
 ```
 
 #### With Static File Serving
@@ -83,7 +83,7 @@ Use custom listener and target addresses:
 Serve web client files alongside the proxy:
 
 ```bash
-./websockify -listen :8080 -target localhost:5900 -web ./web-client
+bin/websockify -listen :8080 -target localhost:5900 -web ./web-client
 ```
 
 ## Architecture
@@ -122,7 +122,7 @@ Configure through environment variables:
 export WEBSOCKIFY_LISTEN=":8080"
 export WEBSOCKIFY_TARGET="localhost:5900"
 export WEBSOCKIFY_WEB="./web"
-./websockify
+bin/websockify
 ```
 
 ### Configuration File
@@ -184,23 +184,23 @@ The project includes comprehensive testing tools:
 
 ```bash
 # Terminal 1: Start VNC server
-./vncserver -port 5900
+bin/vncserver -port 5900
 
 # Terminal 2: Start websockify proxy
-./websockify -listen :8080 -target localhost:5900
+bin/websockify -listen :8080 -target localhost:5900
 
 # Terminal 3: Test with VNC client
-./vncclient -host localhost:8080
+bin/vncclient -host localhost:8080
 ```
 
 #### Echo Server Test
 
 ```bash
 # Terminal 1: Start echo server
-./echoserver -port 5901
+bin/echoserver -port 5901
 
 # Terminal 2: Start websockify proxy
-./websockify -listen :8080 -target localhost:5901
+bin/websockify -listen :8080 -target localhost:5901
 
 # Test with WebSocket client in browser or with testing tools
 ```
@@ -250,7 +250,7 @@ RUN go build -o websockify ./cmd/websockify
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
-COPY --from=builder /app/websockify .
+COPY --from=builder /app/bin/websockify .
 EXPOSE 8080
 CMD ["./websockify", "-listen", ":8080"]
 ```
@@ -297,7 +297,7 @@ location /websockify {
 go mod download
 
 # Build
-go build ./cmd/websockify
+go build -o bin/websockify ./cmd/websockify
 
 # Run tests
 go test ./...
